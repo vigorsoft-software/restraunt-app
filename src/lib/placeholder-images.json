@@ -1,3 +1,46 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-bg",
+      "description": "Atmospheric high-end restaurant kitchen with low lighting",
+      "imageUrl": "https://picsum.photos/seed/culinaro1/1920/1080",
+      "imageHint": "restaurant gourmet kitchen"
+    },
+    {
+      "id": "dish-1",
+      "description": "Artisanally plated sea bass with microgreens",
+      "imageUrl": "https://picsum.photos/seed/fish/600/800",
+      "imageHint": "plated fish gourmet"
+    },
+    {
+      "id": "dish-2",
+      "description": "Truffle pasta with parmesan shavings",
+      "imageUrl": "https://picsum.photos/seed/pasta/800/600",
+      "imageHint": "truffle pasta luxury"
+    },
+    {
+      "id": "dish-3",
+      "description": "Gourmet wagyu beef slider with caramelized onions",
+      "imageUrl": "https://picsum.photos/seed/burger/600/600",
+      "imageHint": "wagyu slider burger"
+    },
+    {
+      "id": "dish-4",
+      "description": "Deconstructed forest berry tart",
+      "imageUrl": "https://picsum.photos/seed/dessert/700/900",
+      "imageHint": "gourmet dessert tart"
+    },
+    {
+      "id": "dish-5",
+      "description": "Roasted seasonal vegetables with balsamic glaze",
+      "imageUrl": "https://picsum.photos/seed/veg/800/800",
+      "imageHint": "roasted vegetables gourmet"
+    },
+    {
+      "id": "dish-6",
+      "description": "Hand-crafted cocktails with botanical garnish",
+      "imageUrl": "https://picsum.photos/seed/drink/600/800",
+      "imageHint": "luxury cocktail garnish"
+    }
+  ]
 }
