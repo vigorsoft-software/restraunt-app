@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -55,10 +55,24 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
       lastOrderedAt: serverTimestamp()
     };
 
+    // Notification for admins
+    const adminNotificationRef = collection(firestore, 'notifications');
+    const adminNotificationData = {
+      userId: 'admin',
+      title: 'New Order Received',
+      message: `${formData.name} placed an order of ₹${total.toFixed(2)}`,
+      read: false,
+      createdAt: serverTimestamp()
+    };
+
+    // Save user mobile for notifications
+    localStorage.setItem('culinaro_user_mobile', formData.mobile);
+
     // Save order and ensure user exists
     Promise.all([
       setDoc(orderRef, orderData),
-      setDoc(userRef, userData, { merge: true })
+      setDoc(userRef, userData, { merge: true }),
+      addDoc(adminNotificationRef, adminNotificationData)
     ])
     .then(() => {
       setLoading(false);

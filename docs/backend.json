@@ -37,7 +37,7 @@
         "mobileNumber": { "type": "string" },
         "items": { "type": "array" },
         "totalAmount": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "confirmed", "delivered"] },
+        "status": { "type": "string", "enum": ["pending", "preparing", "completed", "delivered"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["customerName", "mobileNumber", "items", "totalAmount", "status"]
@@ -54,6 +54,20 @@
         "lastOrderedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["mobileNumber", "name", "isAdmin"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification for users and admins",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "Mobile number or 'admin'" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "read"]
     }
   },
   "auth": {
@@ -75,6 +89,10 @@
     "/users/{mobileNumber}": {
       "schema": "#/backend/entities/User",
       "description": "Collection of users and admins"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "#/backend/entities/Notification",
+      "description": "Real-time notifications for users"
     }
   }
 }

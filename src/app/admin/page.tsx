@@ -10,10 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AIWriter } from '@/components/admin/AIWriter';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { LayoutDashboard, ShoppingCart, Package, Settings, Plus, Save, Loader2, Database, Trash2, Edit2, List, Users, LogOut, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Settings, Plus, Save, Loader2, Database, Trash2, Edit2, List, Users, LogOut, ShieldCheck, CheckCircle, Clock, Utensils } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDoc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Product, Order, Category, User } from '@/lib/types';
@@ -89,6 +89,25 @@ export default function AdminPage() {
   const handleLogout = () => {
     localStorage.removeItem('culinaro_admin_session');
     setIsAuthenticated(false);
+  };
+
+  const handleUpdateOrderStatus = (orderId: string, status: Order['status'], customerMobile: string) => {
+    if (!firestore) return;
+    const orderRef = doc(firestore, 'orders', orderId);
+    
+    updateDoc(orderRef, { status }).then(() => {
+      toast({ title: `Order marked as ${status}` });
+      
+      // Notify customer
+      const notificationRef = collection(firestore, 'notifications');
+      addDoc(notificationRef, {
+        userId: customerMobile,
+        title: `Order #${orderId} Update`,
+        message: `Your order status has been updated to: ${status.toUpperCase()}`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+    });
   };
 
   const handleSaveProduct = () => {
@@ -294,9 +313,37 @@ export default function AdminPage() {
 
           {activeTab === 'orders' && (
             <Card className="bg-card border-border/50 rounded-2xl overflow-hidden">
-              <Table><TableHeader><TableRow><TableHead>Order ID</TableHead><TableHead>Customer</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
+              <Table><TableHeader><TableRow><TableHead>Order ID</TableHead><TableHead>Customer</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Status</TableHead><TableHead className="text-right">Manage</TableHead></TableRow></TableHeader>
                 <TableBody>{orders?.map(o => (
-                  <TableRow key={o.id}><TableCell className="font-mono text-xs">#{o.id}</TableCell><TableCell className="font-bold">{o.customerName}</TableCell><TableCell className="text-right font-bold text-primary">₹{o.totalAmount.toFixed(2)}</TableCell><TableCell className="text-right"><span className="px-2 py-1 bg-primary/20 text-primary text-[10px] uppercase font-bold rounded">{o.status}</span></TableCell></TableRow>
+                  <TableRow key={o.id}>
+                    <TableCell className="font-mono text-xs">#{o.id}</TableCell>
+                    <TableCell>
+                      <div className="font-bold">{o.customerName}</div>
+                      <div className="text-[10px] text-muted-foreground">{o.mobileNumber}</div>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-primary">₹{o.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded ${
+                        o.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
+                        o.status === 'preparing' ? 'bg-blue-500/20 text-blue-500' :
+                        o.status === 'completed' ? 'bg-green-500/20 text-green-500' :
+                        'bg-gray-500/20 text-gray-500'
+                      }`}>
+                        {o.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleUpdateOrderStatus(o.id, 'preparing', o.mobileNumber)} title="Mark Preparing">
+                        <Utensils className="w-4 h-4 text-blue-500" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleUpdateOrderStatus(o.id, 'completed', o.mobileNumber)} title="Mark Completed">
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleUpdateOrderStatus(o.id, 'delivered', o.mobileNumber)} title="Mark Delivered">
+                        <Package className="w-4 h-4 text-gray-400" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}</TableBody></Table></Card>
           )}
         </div>

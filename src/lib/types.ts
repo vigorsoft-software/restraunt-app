@@ -25,7 +25,7 @@ export interface Order {
   mobileNumber: string;
   items: CartItem[];
   totalAmount: number;
-  status: 'pending' | 'confirmed' | 'delivered';
+  status: 'pending' | 'preparing' | 'completed' | 'delivered';
   createdAt: any;
 }
 
@@ -35,4 +35,13 @@ export interface User {
   isAdmin: boolean;
   password?: string;
   lastOrderedAt?: any;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: any;
 }
