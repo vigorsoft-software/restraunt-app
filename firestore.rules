@@ -1,0 +1,28 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow public access to view products and categories
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if true; // In production, restrict to admin
+    }
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if true; // In production, restrict to admin
+    }
+    
+    // Allow users to create orders and see their own user profile
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+    match /users/{mobileNumber} {
+      allow read, write: if true;
+    }
+    
+    // Allow notifications for users
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+  }
+}
