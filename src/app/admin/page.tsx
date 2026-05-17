@@ -13,7 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { LayoutDashboard, ShoppingCart, Package, Settings, Plus, Save, Loader2, Database, Trash2, Edit2, List, Users, LogOut, ShieldCheck, CheckCircle, Clock, Utensils, Image as ImageIcon, Key } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, useFirebaseApp } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, getDoc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDoc, updateDoc, serverTimestamp, addDoc, query, orderBy, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -30,6 +30,7 @@ export default function AdminPage() {
   const firestore = useFirestore();
 
   const [telegramConfig, setTelegramConfig] = useState({ botToken: '', chatId: '' });
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     if (firestore && isAuthenticated && activeTab === 'settings') {
@@ -110,6 +111,9 @@ export default function AdminPage() {
   const { data: orders, loading: ordersLoading } = useCollection<Order>(ordersRef);
   const { data: categories, loading: categoriesLoading } = useCollection<Category>(categoriesRef);
   const { data: users, loading: usersLoading } = useCollection<User>(usersRef);
+  
+  const telegramLogsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'telegram_logs'), orderBy('timestamp', 'desc'), limit(50)) : null, [firestore]);
+  const { data: telegramLogs } = useCollection<any>(telegramLogsRef as any);
 
   useEffect(() => {
     const adminSession = localStorage.getItem('culinaro_admin_session');
@@ -146,6 +150,61 @@ export default function AdminPage() {
   const handleLogout = () => {
     localStorage.removeItem('culinaro_admin_session');
     setIsAuthenticated(false);
+  };
+
+  const handleRetryTelegram = async (log: any) => {
+    if (!firestore) return;
+    setIsRetrying(true);
+    try {
+      const orderDoc = await getDoc(doc(firestore, 'orders', log.orderId));
+      if (!orderDoc.exists()) {
+        toast({ title: "Order not found", variant: "destructive" });
+        return;
+      }
+      const order = orderDoc.data() as Order;
+      
+      let config = telegramConfig;
+      if (!config.botToken || !config.chatId) {
+        config = {
+          botToken: process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '',
+          chatId: process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID || ''
+        };
+      }
+      
+      if (!config.botToken || !config.chatId) {
+        toast({ title: "Telegram config missing", variant: "destructive" });
+        return;
+      }
+      
+      const itemsList = order.items.map(i => `${i.quantity}x ${i.name}`).join('\n');
+      const text = `New Order Received! (RETRY)\n\nCustomer: ${order.customerName}\nMobile: ${order.mobileNumber}\nTotal: ₹${order.totalAmount.toFixed(2)}\n\nItems:\n${itemsList}`;
+      
+      const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: config.chatId,
+          text: text
+        })
+      });
+      const responseStatus = res.status;
+      const responseBody = await res.text();
+      
+      await addDoc(collection(firestore, 'telegram_logs'), {
+        orderId: log.orderId,
+        chatId: config.chatId,
+        status: responseStatus,
+        response: responseBody,
+        timestamp: serverTimestamp(),
+        isRetry: true
+      });
+      
+      toast({ title: responseStatus === 200 ? "Retried successfully!" : "Retry failed", variant: responseStatus === 200 ? "default" : "destructive" });
+    } catch (e) {
+      toast({ title: "Error retrying", variant: "destructive" });
+    } finally {
+      setIsRetrying(false);
+    }
   };
 
   const handleUpdateOrderStatus = (orderId: string, status: Order['status'], customerMobile: string) => {
@@ -280,7 +339,7 @@ export default function AdminPage() {
             <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
               <Key className="text-primary w-6 h-6" />
             </div>
-            <CardTitle className="text-3xl font-headline italic text-primary">Culinaro Access</CardTitle>
+            <CardTitle className="text-3xl font-headline italic text-primary">Galaxy Grand Cafe Access</CardTitle>
             <p className="text-xs text-muted-foreground uppercase tracking-widest">Administrative Portal</p>
           </CardHeader>
           <CardContent>
@@ -325,7 +384,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
       <aside className="w-72 border-r border-border/50 bg-card/50 backdrop-blur-xl p-8 flex flex-col gap-10">
-        <Link href="/" className="text-3xl font-headline italic text-primary px-2">Culinaro</Link>
+        <Link href="/" className="text-3xl font-headline italic text-primary px-2">Galaxy Grand Cafe</Link>
         <nav className="flex flex-col gap-3 flex-1">
           <Button variant={activeTab === 'inventory' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('inventory')}><Package className="w-5 h-5" /> Inventory</Button>
           <Button variant={activeTab === 'categories' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('categories')}><List className="w-5 h-5" /> Categories</Button>
@@ -620,6 +679,41 @@ export default function AdminPage() {
                   <Button className="h-12 gap-2 font-bold rounded-xl" onClick={handleSaveTelegramConfig}>
                     <Save className="w-4 h-4" /> Save Configuration
                   </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border/50 rounded-3xl overflow-hidden shadow-xl mt-8">
+                <CardHeader className="bg-muted/30">
+                  <CardTitle className="text-sm uppercase tracking-widest font-bold">Notification History</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-muted/30"><TableRow><TableHead>Order</TableHead><TableHead>Time</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {telegramLogs?.map((log: any) => (
+                        <TableRow key={log.id} className="hover:bg-muted/10 transition-colors">
+                          <TableCell className="font-mono text-xs opacity-70">#{log.orderId}</TableCell>
+                          <TableCell className="text-xs">{log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString() : 'Just now'}</TableCell>
+                          <TableCell>
+                            {log.status === 200 ? (
+                              <span className="text-green-500 text-xs font-bold px-2 py-1 bg-green-500/10 rounded-full">Success</span>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-destructive text-xs font-bold px-2 py-1 bg-destructive/10 rounded-full w-fit">Failed</span>
+                                <span className="text-[10px] text-muted-foreground line-clamp-1 max-w-[200px]" title={log.response || log.error}>{log.response || log.error}</span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" onClick={() => handleRetryTelegram(log)} disabled={isRetrying}>Retry</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {(!telegramLogs || telegramLogs.length === 0) && (
+                        <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic text-xs">No logs found.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </div>

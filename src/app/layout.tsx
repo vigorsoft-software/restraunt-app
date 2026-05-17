@@ -6,7 +6,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import { NotificationListener } from '@/components/notifications/NotificationListener';
 
 export const metadata: Metadata = {
-  title: 'Culinaro | Artisanal Gastronomy',
+  title: 'Galaxy Grand Cafe | Artisanal Gastronomy',
   description: 'Experience the art of fine dining delivered to your doorstep.',
 };
 

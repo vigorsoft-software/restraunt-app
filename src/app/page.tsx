@@ -19,7 +19,7 @@ export default function Home() {
           <div className="absolute inset-0 z-0">
             <Image 
               src={heroImage?.imageUrl || ''} 
-              alt="Culinaro Hero" 
+              alt="Galaxy Grand Cafe Hero" 
               fill 
               priority
               className="object-cover opacity-40 grayscale-[0.5]"
@@ -45,10 +45,10 @@ export default function Home() {
 
         <footer className="py-20 border-t border-border/50 text-center">
           <div className="max-w-7xl mx-auto px-4 space-y-4">
-            <h2 className="text-3xl font-headline text-primary">Culinaro</h2>
+            <h2 className="text-3xl font-headline text-primary">Galaxy Grand Cafe</h2>
             <p className="text-muted-foreground text-sm uppercase tracking-widest">Crafting Memories Since 2024</p>
             <div className="pt-8 text-xs text-muted-foreground opacity-50">
-              &copy; 2024 Culinaro Gastronomy Group. All rights reserved.
+              &copy; 2024 Galaxy Grand Cafe. All rights reserved.
             </div>
           </div>
         </footer>

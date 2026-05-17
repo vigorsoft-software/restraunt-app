@@ -19,7 +19,7 @@ export function Navbar() {
             <Menu className="w-5 h-5" />
           </Button>
           <Link href="/" className="text-2xl font-headline italic text-primary">
-            Culinaro
+            Galaxy Grand Cafe
           </Link>
         </div>
 

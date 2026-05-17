@@ -77,17 +77,29 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
     .then(async () => {
       // Send Telegram notification
       try {
-        let config = null;
-        const cached = sessionStorage.getItem('telegramConfig');
-        if (cached) {
-          config = JSON.parse(cached);
+        let config: any = {
+          botToken: process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '',
+          chatId: process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID || ''
+        };
+
+        if (!config.botToken || !config.chatId) {
+          const cached = sessionStorage.getItem('telegramConfig');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed.botToken && parsed.chatId) {
+              config = parsed;
+            }
+          }
         }
         
-        if (!config || !config.botToken || !config.chatId) {
+        if (!config.botToken || !config.chatId) {
           const snap = await getDoc(doc(firestore, 'settings', 'telegram'));
           if (snap.exists()) {
-            config = snap.data();
-            sessionStorage.setItem('telegramConfig', JSON.stringify(config));
+            const data = snap.data();
+            if (data.botToken && data.chatId) {
+              config = data;
+              sessionStorage.setItem('telegramConfig', JSON.stringify(config));
+            }
           }
         }
 
