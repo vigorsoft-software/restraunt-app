@@ -1,7 +1,6 @@
-
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,11 +18,29 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
   const firestore = useFirestore();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
+  const [botUsername, setBotUsername] = useState<string>(process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'GalaxyGrandCafeBot');
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
     allowNotifications: true
   });
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchConfig = async () => {
+      try {
+        const snap = await getDoc(doc(firestore, 'settings', 'telegram'));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.botUsername) setBotUsername(data.botUsername);
+        }
+      } catch (e) {
+        console.error('Failed to fetch telegram config', e);
+      }
+    };
+    fetchConfig();
+  }, [firestore]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,86 +100,9 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
       addDoc(adminNotificationRef, adminNotificationData)
     ])
     .then(async () => {
-      // Send Telegram notification
-      try {
-        let config: any = {
-          botToken: process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '',
-          chatId: process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID || ''
-        };
-
-        if (!config.botToken || !config.chatId) {
-          const cached = sessionStorage.getItem('telegramConfig');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (parsed.botToken && parsed.chatId) {
-              config = parsed;
-            }
-          }
-        }
-        
-        if (!config.botToken || !config.chatId) {
-          const snap = await getDoc(doc(firestore, 'settings', 'telegram'));
-          if (snap.exists()) {
-            const data = snap.data();
-            if (data.botToken && data.chatId) {
-              config = data;
-              sessionStorage.setItem('telegramConfig', JSON.stringify(config));
-            }
-          }
-        }
-
-        if (config && config.botToken && config.chatId) {
-          const itemsList = items.map(i => `${i.quantity}x ${i.name}`).join('\n');
-          const text = `New Order Received!\n\nCustomer: ${formData.name}\nMobile: ${formData.mobile}\nTotal: ₹${total.toFixed(2)}\n\nItems:\n${itemsList}`;
-          
-          let responseStatus = null;
-          let responseBody = null;
-          try {
-            const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: config.chatId,
-                text: text
-              })
-            });
-            responseStatus = res.status;
-            responseBody = await res.text();
-            
-            await addDoc(collection(firestore, 'telegram_logs'), {
-              orderId,
-              chatId: config.chatId,
-              status: responseStatus,
-              response: responseBody,
-              timestamp: serverTimestamp()
-            });
-          } catch (fetchError: any) {
-            await addDoc(collection(firestore, 'telegram_logs'), {
-              orderId,
-              chatId: config.chatId,
-              error: fetchError.message || String(fetchError),
-              timestamp: serverTimestamp()
-            });
-          }
-        } else {
-          await addDoc(collection(firestore, 'telegram_logs'), {
-            orderId,
-            error: "Missing botToken or chatId in config",
-            configFound: !!config,
-            timestamp: serverTimestamp()
-          });
-        }
-      } catch (e: any) {
-        console.error("Telegram notification failed", e);
-        await addDoc(collection(firestore, 'telegram_logs'), {
-          orderId,
-          error: e.message || String(e),
-          timestamp: serverTimestamp()
-        });
-      }
-
       setLoading(false);
       setSuccess(true);
+      setPlacedOrderId(orderId);
       clearCart();
       toast({ title: "Order placed successfully!" });
     })
@@ -177,17 +117,33 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
     });
   };
 
-  if (success) {
+  if (success && placedOrderId) {
+    const telegramLink = `https://t.me/${botUsername}?start=ORDER_${placedOrderId}`;
+
     return (
       <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
+        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-2">
           <CheckCircle2 className="w-10 h-10 text-primary" />
         </div>
         <div className="space-y-2">
-          <h3 className="font-headline text-3xl">Order Confirmed</h3>
-          <p className="text-muted-foreground">Your order has been received. Our barista is preparing it for you.</p>
+          <h3 className="font-headline text-3xl">Order Confirmed!</h3>
+          <p className="text-muted-foreground">Your order <span className="font-bold text-foreground">#{placedOrderId}</span> has been received.</p>
         </div>
-        <Button className="w-full" onClick={() => window.location.href = '/'}>
+
+        <div className="w-full bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border border-blue-200 dark:border-blue-800 space-y-4">
+          <h4 className="font-bold text-blue-700 dark:text-blue-400">Track on Telegram</h4>
+          <p className="text-sm text-blue-600 dark:text-blue-300">
+            Get instant real-time updates for your order directly on Telegram!
+          </p>
+          <Button 
+            className="w-full bg-[#0088cc] hover:bg-[#0077b3] text-white font-bold"
+            onClick={() => window.open(telegramLink, '_blank')}
+          >
+            Get Telegram Order Updates
+          </Button>
+        </div>
+
+        <Button className="w-full" variant="outline" onClick={() => window.location.href = '/'}>
           Return to Menu
         </Button>
       </div>

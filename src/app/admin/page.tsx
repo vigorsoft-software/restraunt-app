@@ -31,14 +31,20 @@ export default function AdminPage() {
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const firestore = useFirestore();
 
-  const [telegramConfig, setTelegramConfig] = useState({ botToken: '', chatId: '' });
+  const [telegramConfig, setTelegramConfig] = useState({ botToken: '', chatId: '', botUsername: '', webhookSecret: '' });
   const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     if (firestore && isAuthenticated && activeTab === 'settings') {
       getDoc(doc(firestore, 'settings', 'telegram')).then(snap => {
         if (snap.exists()) {
-          setTelegramConfig(snap.data() as { botToken: string, chatId: string });
+          const data = snap.data();
+          setTelegramConfig({
+            botToken: data.botToken || '',
+            chatId: data.chatId || '',
+            botUsername: data.botUsername || '',
+            webhookSecret: data.webhookSecret || ''
+          });
         }
       });
     }
@@ -252,22 +258,33 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateOrderStatus = (orderId: string, status: Order['status'], customerMobile: string) => {
-    if (!firestore) return;
-    const orderRef = doc(firestore, 'orders', orderId);
-    
-    updateDoc(orderRef, { status }).then(() => {
+  const handleUpdateOrderStatus = async (orderId: string, status: Order['status'], customerMobile: string) => {
+    try {
+      const response = await fetch('/api/admin/update-order-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+
       toast({ title: `Order marked as ${status}` });
       
-      const notificationRef = collection(firestore, 'notifications');
-      addDoc(notificationRef, {
-        userId: customerMobile,
-        title: `Order Update: ${status}`,
-        message: `Your culinary selection is now ${status}.`,
-        read: false,
-        createdAt: serverTimestamp()
-      });
-    });
+      if (firestore) {
+        const notificationRef = collection(firestore, 'notifications');
+        addDoc(notificationRef, {
+          userId: customerMobile,
+          title: `Order Update: ${status}`,
+          message: `Your culinary selection is now ${status}.`,
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error updating order", variant: "destructive" });
+    }
   };
 
   const handleSaveProduct = () => {
@@ -675,7 +692,7 @@ export default function AdminPage() {
                 <CardContent className="space-y-6 pt-8">
                   <p className="text-sm text-muted-foreground">Configure a Telegram Bot to receive real-time order notifications.</p>
                   <div className="space-y-2">
-                    <Label>Bot Token</Label>
+                    <Label>Bot Token (for sending updates)</Label>
                     <Input 
                       placeholder="e.g. 123456789:ABCdefGHIjklMNO..." 
                       value={telegramConfig.botToken} 
@@ -683,11 +700,28 @@ export default function AdminPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Chat ID</Label>
+                    <Label>Admin Chat ID (for new order notifications)</Label>
                     <Input 
                       placeholder="e.g. -1001234567890" 
                       value={telegramConfig.chatId} 
                       onChange={e => setTelegramConfig(p => ({...p, chatId: e.target.value}))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bot Username (for generating tracking links)</Label>
+                    <Input 
+                      placeholder="e.g. GalaxyGrandCafeBot" 
+                      value={telegramConfig.botUsername} 
+                      onChange={e => setTelegramConfig(p => ({...p, botUsername: e.target.value}))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Webhook Secret (for verifying requests)</Label>
+                    <Input 
+                      type="password"
+                      placeholder="Your secret string" 
+                      value={telegramConfig.webhookSecret} 
+                      onChange={e => setTelegramConfig(p => ({...p, webhookSecret: e.target.value}))}
                     />
                   </div>
                   <Button className="h-12 gap-2 font-bold rounded-xl" onClick={handleSaveTelegramConfig}>
