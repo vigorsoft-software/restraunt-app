@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, updateDoc } from 'firebase/firestore';
+import { firebaseConfig } from '@/firebase/config';
 import { sendOrderUpdate } from '@/lib/telegram';
+
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,8 +16,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Update Firestore Document
-    const adminDb = getAdminDb();
-    await adminDb.collection('orders').doc(orderId).update({
+    const orderRef = doc(db, 'orders', orderId);
+    await updateDoc(orderRef, {
       status: status
     });
 

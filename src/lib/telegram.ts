@@ -1,10 +1,15 @@
-import { getAdminDb } from './firebase-admin';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { firebaseConfig } from '@/firebase/config';
+
+// Initialize Firebase for the server route
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 export async function getTelegramConfig() {
-  const adminDb = getAdminDb();
-  const doc = await adminDb.collection('settings').doc('telegram').get();
-  if (doc.exists) {
-    return doc.data() as { botToken?: string; botUsername?: string; webhookSecret?: string; chatId?: string };
+  const settingsDoc = await getDoc(doc(db, 'settings', 'telegram'));
+  if (settingsDoc.exists()) {
+    return settingsDoc.data() as { botToken?: string; botUsername?: string; webhookSecret?: string; chatId?: string };
   }
   return {};
 }
@@ -80,15 +85,14 @@ export async function sendTelegramMessage(chatId: string | number, text: string,
  */
 export async function sendOrderUpdate(orderId: string, status: string, totalAmount?: number) {
   try {
-    const adminDb = getAdminDb();
-    const orderDoc = await adminDb.collection('orders').doc(orderId).get();
+    const orderDocSnap = await getDoc(doc(db, 'orders', orderId));
     
-    if (!orderDoc.exists) {
+    if (!orderDocSnap.exists()) {
       console.error(`Order ${orderId} not found`);
       return false;
     }
 
-    const orderData = orderDoc.data();
+    const orderData = orderDocSnap.data();
     const telegramChatId = orderData?.telegramChatId;
 
     if (!telegramChatId) {

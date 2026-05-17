@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, updateDoc, collection, query, where, orderBy, limit, getDocs, serverTimestamp } from 'firebase/firestore';
+import { firebaseConfig } from '@/firebase/config';
 import { verifyWebhookSecret, sendTelegramMessage } from '@/lib/telegram';
+
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 export async function POST(request: NextRequest) {
   // 1. Verify Secret Token
@@ -22,15 +27,14 @@ export async function POST(request: NextRequest) {
         const orderId = text.replace('/start ORDER_', '').trim();
         
         // Find order in Firestore
-        const adminDb = getAdminDb();
-        const orderRef = adminDb.collection('orders').doc(orderId);
-        const orderDoc = await orderRef.get();
+        const orderRef = doc(db, 'orders', orderId);
+        const orderDocSnap = await getDoc(orderRef);
 
-        if (orderDoc.exists) {
+        if (orderDocSnap.exists()) {
           // Link Chat ID
-          await orderRef.update({
+          await updateDoc(orderRef, {
             telegramChatId: chatId,
-            updatedAt: new Date()
+            updatedAt: serverTimestamp()
           });
           
           await sendTelegramMessage(
@@ -44,17 +48,18 @@ export async function POST(request: NextRequest) {
       } 
       // Handle /track
       else if (text === '/track' || text.startsWith('/track ')) {
-        const adminDb = getAdminDb();
-        const ordersQuery = await adminDb.collection('orders')
-          .where('telegramChatId', '==', chatId)
-          .orderBy('createdAt', 'desc')
-          .limit(1)
-          .get();
+        const ordersQuery = query(
+          collection(db, 'orders'),
+          where('telegramChatId', '==', chatId),
+          orderBy('createdAt', 'desc'),
+          limit(1)
+        );
+        const ordersSnapshot = await getDocs(ordersQuery);
 
-        if (!ordersQuery.empty) {
-          const order = ordersQuery.docs[0];
-          const orderData = order.data();
-          await sendTelegramMessage(chatId, `📦 *Order Status*\n\nOrder ID: \`${order.id}\`\nStatus: *${orderData.status.toUpperCase()}*`);
+        if (!ordersSnapshot.empty) {
+          const orderDoc = ordersSnapshot.docs[0];
+          const orderData = orderDoc.data();
+          await sendTelegramMessage(chatId, `📦 *Order Status*\n\nOrder ID: \`${orderDoc.id}\`\nStatus: *${orderData.status.toUpperCase()}*`);
         } else {
           await sendTelegramMessage(chatId, "You don't have any linked orders currently.");
         }
@@ -75,11 +80,10 @@ export async function POST(request: NextRequest) {
       const chatId = update.callback_query.message.chat.id;
 
       if (data.startsWith('track_')) {
-        const adminDb = getAdminDb();
         const orderId = data.replace('track_', '');
-        const orderDoc = await adminDb.collection('orders').doc(orderId).get();
-        if (orderDoc.exists) {
-           await sendTelegramMessage(chatId, `📦 *Order Status*\n\nOrder ID: \`${orderId}\`\nStatus: *${orderDoc.data()?.status.toUpperCase()}*`);
+        const orderDocSnap = await getDoc(doc(db, 'orders', orderId));
+        if (orderDocSnap.exists()) {
+           await sendTelegramMessage(chatId, `📦 *Order Status*\n\nOrder ID: \`${orderId}\`\nStatus: *${orderDocSnap.data()?.status.toUpperCase()}*`);
         }
       }
       // Respond to callback query to remove loading state
