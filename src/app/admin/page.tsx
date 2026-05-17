@@ -27,6 +27,8 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ mobile: '', password: '' });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const firestore = useFirestore();
 
   const [telegramConfig, setTelegramConfig] = useState({ botToken: '', chatId: '' });
@@ -118,11 +120,41 @@ export default function AdminPage() {
   useEffect(() => {
     const adminSession = localStorage.getItem('culinaro_admin_session');
     if (adminSession) setIsAuthenticated(true);
+
+    const lockout = localStorage.getItem('admin_lockout_until');
+    if (lockout) {
+      const lockoutTime = parseInt(lockout, 10);
+      if (Date.now() < lockoutTime) {
+        setLockoutUntil(lockoutTime);
+        setFailedAttempts(3);
+      } else {
+        localStorage.removeItem('admin_lockout_until');
+      }
+    }
   }, []);
+
+  const handleFailedLogin = () => {
+    const newAttempts = failedAttempts + 1;
+    setFailedAttempts(newAttempts);
+    if (newAttempts >= 3) {
+      const lockoutTime = Date.now() + 5 * 60 * 1000; // 5 minutes
+      setLockoutUntil(lockoutTime);
+      localStorage.setItem('admin_lockout_until', lockoutTime.toString());
+      toast({ title: "Too many failed attempts. Locked out for 5 minutes.", variant: "destructive" });
+    } else {
+      toast({ title: `Invalid credentials. ${3 - newAttempts} attempts left.`, variant: "destructive" });
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore) return;
+    
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      toast({ title: `Locked out. Try again in ${Math.ceil((lockoutUntil - Date.now()) / 60000)}m.`, variant: "destructive" });
+      return;
+    }
+
     setIsLoggingIn(true);
 
     try {
@@ -133,15 +165,18 @@ export default function AdminPage() {
         if (userData.isAdmin && userData.password === loginForm.password) {
           localStorage.setItem('culinaro_admin_session', loginForm.mobile);
           setIsAuthenticated(true);
+          setFailedAttempts(0);
+          setLockoutUntil(null);
+          localStorage.removeItem('admin_lockout_until');
           toast({ title: "Login Successful" });
         } else {
-          toast({ title: "Invalid admin credentials", variant: "destructive" });
+          handleFailedLogin();
         }
       } else {
-        toast({ title: "User not found", variant: "destructive" });
+        handleFailedLogin();
       }
     } catch (err) {
-      toast({ title: "Login failed", variant: "destructive" });
+      handleFailedLogin();
     } finally {
       setIsLoggingIn(false);
     }
@@ -299,37 +334,6 @@ export default function AdminPage() {
     });
   };
 
-  const handleSeedDatabase = () => {
-    if (!firestore) return;
-    
-    // Default Admin (Username: admin, Password: admin)
-    setDoc(doc(firestore, 'users', 'admin'), {
-      mobileNumber: 'admin',
-      name: 'Primary Administrator',
-      isAdmin: true,
-      password: 'admin'
-    });
-
-    // Default Mobile Admin (Username: 9999999999, Password: admin)
-    setDoc(doc(firestore, 'users', '9999999999'), {
-      mobileNumber: '9999999999',
-      name: 'System Admin',
-      isAdmin: true,
-      password: 'admin'
-    });
-
-    ['Starters', 'Soups', 'Mains', 'Juice', 'Desserts'].forEach(name => {
-      const id = name.toLowerCase();
-      setDoc(doc(firestore, 'categories', id), { 
-        id, 
-        name,
-        imageUrl: `https://picsum.photos/seed/cat-${id}/400/300`
-      });
-    });
-
-    INITIAL_PRODUCTS.forEach(p => setDoc(doc(firestore, 'products', p.id), p));
-    toast({ title: "Database seeded. Use admin/admin to login." });
-  };
 
   if (!isAuthenticated) {
     return (
@@ -365,14 +369,9 @@ export default function AdminPage() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full h-12 font-bold text-lg" disabled={isLoggingIn}>
-                {isLoggingIn ? <Loader2 className="animate-spin" /> : 'Sign In'}
+              <Button type="submit" className="w-full h-12 font-bold text-lg" disabled={isLoggingIn || (lockoutUntil !== null && Date.now() < lockoutUntil)}>
+                {isLoggingIn ? <Loader2 className="animate-spin" /> : (lockoutUntil && Date.now() < lockoutUntil ? `Locked (Wait ${Math.ceil((lockoutUntil - Date.now()) / 60000)}m)` : 'Sign In')}
               </Button>
-              <div className="pt-4 border-t border-border/50">
-                <Button variant="ghost" type="button" className="w-full text-[10px] opacity-40 hover:opacity-100" onClick={handleSeedDatabase}>
-                  Provision Default Admin (admin/admin)
-                </Button>
-              </div>
             </form>
           </CardContent>
         </Card>
@@ -381,27 +380,32 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Sidebar */}
-      <aside className="w-72 border-r border-border/50 bg-card/50 backdrop-blur-xl p-8 flex flex-col gap-10">
-        <Link href="/" className="text-3xl font-headline italic text-primary px-2">Galaxy Grand Cafe</Link>
-        <nav className="flex flex-col gap-3 flex-1">
-          <Button variant={activeTab === 'inventory' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('inventory')}><Package className="w-5 h-5" /> Inventory</Button>
-          <Button variant={activeTab === 'categories' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('categories')}><List className="w-5 h-5" /> Categories</Button>
-          <Button variant={activeTab === 'orders' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('orders')}><ShoppingCart className="w-5 h-5" /> Orders</Button>
-          <Button variant={activeTab === 'users' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('users')}><Users className="w-5 h-5" /> User Base</Button>
-          <Button variant={activeTab === 'settings' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('settings')}><Settings className="w-5 h-5" /> Settings</Button>
+      <aside className="w-full md:w-72 md:h-screen md:sticky md:top-0 border-b md:border-b-0 md:border-r border-border/50 bg-card/50 backdrop-blur-xl p-4 md:p-8 flex flex-col gap-4 md:gap-10 z-30">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="text-2xl md:text-3xl font-headline italic text-primary px-2">Galaxy Grand Cafe</Link>
+          <Button variant="ghost" size="icon" className="md:hidden text-destructive" onClick={handleLogout}><LogOut className="w-5 h-5" /></Button>
+        </div>
+        <nav className="flex flex-row md:flex-col gap-2 md:gap-3 overflow-x-auto no-scrollbar pb-2 md:pb-0">
+          <Button variant={activeTab === 'inventory' ? 'secondary' : 'ghost'} className="whitespace-nowrap justify-start gap-2 md:gap-4 h-10 md:h-14 rounded-xl md:rounded-2xl font-bold text-sm md:text-base" onClick={() => setActiveTab('inventory')}><Package className="w-4 h-4 md:w-5 md:h-5" /> Inventory</Button>
+          <Button variant={activeTab === 'categories' ? 'secondary' : 'ghost'} className="whitespace-nowrap justify-start gap-2 md:gap-4 h-10 md:h-14 rounded-xl md:rounded-2xl font-bold text-sm md:text-base" onClick={() => setActiveTab('categories')}><List className="w-4 h-4 md:w-5 md:h-5" /> Categories</Button>
+          <Button variant={activeTab === 'orders' ? 'secondary' : 'ghost'} className="whitespace-nowrap justify-start gap-2 md:gap-4 h-10 md:h-14 rounded-xl md:rounded-2xl font-bold text-sm md:text-base" onClick={() => setActiveTab('orders')}><ShoppingCart className="w-4 h-4 md:w-5 md:h-5" /> Orders</Button>
+          <Button variant={activeTab === 'users' ? 'secondary' : 'ghost'} className="whitespace-nowrap justify-start gap-2 md:gap-4 h-10 md:h-14 rounded-xl md:rounded-2xl font-bold text-sm md:text-base" onClick={() => setActiveTab('users')}><Users className="w-4 h-4 md:w-5 md:h-5" /> User Base</Button>
+          <Button variant={activeTab === 'settings' ? 'secondary' : 'ghost'} className="whitespace-nowrap justify-start gap-2 md:gap-4 h-10 md:h-14 rounded-xl md:rounded-2xl font-bold text-sm md:text-base" onClick={() => setActiveTab('settings')}><Settings className="w-4 h-4 md:w-5 md:h-5" /> Settings</Button>
         </nav>
-        <Button variant="ghost" className="justify-start gap-4 h-14 rounded-2xl text-destructive font-bold" onClick={handleLogout}><LogOut className="w-5 h-5" /> Sign Out</Button>
+        <div className="hidden md:flex mt-auto">
+          <Button variant="ghost" className="w-full justify-start gap-4 h-14 rounded-2xl text-destructive font-bold" onClick={handleLogout}><LogOut className="w-5 h-5" /> Sign Out</Button>
+        </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-12 overflow-auto">
-        <div className="max-w-6xl mx-auto space-y-12">
+      <main className="flex-1 p-4 md:p-12 overflow-auto w-full">
+        <div className="max-w-6xl mx-auto space-y-6 md:space-y-12">
           <header className="flex items-center justify-between">
             <div>
-              <h1 className="text-5xl font-headline capitalize">{activeTab}</h1>
-              <p className="text-muted-foreground mt-2 uppercase tracking-widest text-xs">Management & Control</p>
+              <h1 className="text-3xl md:text-5xl font-headline capitalize">{activeTab}</h1>
+              <p className="text-muted-foreground mt-1 md:mt-2 uppercase tracking-widest text-[10px] md:text-xs">Management & Control</p>
             </div>
           </header>
 
