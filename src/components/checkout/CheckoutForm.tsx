@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from 'react';
@@ -6,11 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { addOrder } from '@/lib/store';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { useFirestore } from '@/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export function CheckoutForm({ onBack }: { onBack: () => void }) {
   const { items, total, clearCart } = useCart();
+  const firestore = useFirestore();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
@@ -20,28 +25,44 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!firestore) return;
+    
     if (!formData.name || !formData.mobile) {
       toast({ title: "Please fill all fields", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-    // Simulate API delay
-    await new Promise(r => setTimeout(r, 1500));
     
-    addOrder({
-      id: Math.random().toString(36).substr(2, 9),
+    const orderId = Math.random().toString(36).substr(2, 9);
+    const orderRef = doc(firestore, 'orders', orderId);
+    
+    const orderData = {
+      id: orderId,
       customerName: formData.name,
       mobileNumber: formData.mobile,
       items: items,
       totalAmount: total,
-      status: 'pending',
-      createdAt: new Date()
-    });
+      status: 'pending' as const,
+      createdAt: serverTimestamp()
+    };
 
-    setLoading(false);
-    setSuccess(true);
-    clearCart();
+    setDoc(orderRef, orderData)
+      .then(() => {
+        setLoading(false);
+        setSuccess(true);
+        clearCart();
+        toast({ title: "Order placed successfully!" });
+      })
+      .catch(async (error) => {
+        setLoading(false);
+        const permissionError = new FirestorePermissionError({
+          path: orderRef.path,
+          operation: 'create',
+          requestResourceData: orderData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   if (success) {

@@ -1,4 +1,5 @@
-export type Category = 'All' | 'Signature' | 'Mains' | 'Sides' | 'Desserts' | 'Spirits';
+
+export type Category = 'All' | 'Starters' | 'Soups' | 'Mains' | 'Juice' | 'Desserts';
 
 export interface Product {
   id: string;
@@ -21,5 +22,5 @@ export interface Order {
   items: CartItem[];
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'delivered';
-  createdAt: Date;
+  createdAt: any; // Firestore Timestamp or Date
 }

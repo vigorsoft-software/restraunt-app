@@ -1,0 +1,48 @@
+
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A food or drink item on the menu",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "ingredients": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "price", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "delivered"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "mobileNumber", "items", "totalAmount", "status"]
+    }
+  },
+  "auth": {
+    "providers": ["google.com"]
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "#/backend/entities/Product",
+      "description": "Collection of menu items"
+    },
+    "/orders/{orderId}": {
+      "schema": "#/backend/entities/Order",
+      "description": "Collection of customer orders"
+    }
+  }
+}
