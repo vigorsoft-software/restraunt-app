@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -74,7 +74,73 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
       setDoc(userRef, userData, { merge: true }),
       addDoc(adminNotificationRef, adminNotificationData)
     ])
-    .then(() => {
+    .then(async () => {
+      // Send Telegram notification
+      try {
+        let config = null;
+        const cached = sessionStorage.getItem('telegramConfig');
+        if (cached) {
+          config = JSON.parse(cached);
+        }
+        
+        if (!config || !config.botToken || !config.chatId) {
+          const snap = await getDoc(doc(firestore, 'settings', 'telegram'));
+          if (snap.exists()) {
+            config = snap.data();
+            sessionStorage.setItem('telegramConfig', JSON.stringify(config));
+          }
+        }
+
+        if (config && config.botToken && config.chatId) {
+          const itemsList = items.map(i => `${i.quantity}x ${i.name}`).join('\n');
+          const text = `New Order Received!\n\nCustomer: ${formData.name}\nMobile: ${formData.mobile}\nTotal: ₹${total.toFixed(2)}\n\nItems:\n${itemsList}`;
+          
+          let responseStatus = null;
+          let responseBody = null;
+          try {
+            const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: config.chatId,
+                text: text
+              })
+            });
+            responseStatus = res.status;
+            responseBody = await res.text();
+            
+            await addDoc(collection(firestore, 'telegram_logs'), {
+              orderId,
+              chatId: config.chatId,
+              status: responseStatus,
+              response: responseBody,
+              timestamp: serverTimestamp()
+            });
+          } catch (fetchError: any) {
+            await addDoc(collection(firestore, 'telegram_logs'), {
+              orderId,
+              chatId: config.chatId,
+              error: fetchError.message || String(fetchError),
+              timestamp: serverTimestamp()
+            });
+          }
+        } else {
+          await addDoc(collection(firestore, 'telegram_logs'), {
+            orderId,
+            error: "Missing botToken or chatId in config",
+            configFound: !!config,
+            timestamp: serverTimestamp()
+          });
+        }
+      } catch (e: any) {
+        console.error("Telegram notification failed", e);
+        await addDoc(collection(firestore, 'telegram_logs'), {
+          orderId,
+          error: e.message || String(e),
+          timestamp: serverTimestamp()
+        });
+      }
+
       setLoading(false);
       setSuccess(true);
       clearCart();

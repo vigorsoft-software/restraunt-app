@@ -24,5 +24,15 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read, write: if true;
     }
+    
+    // Allow settings to be read and written
+    match /settings/{document=**} {
+      allow read, write: if true;
+    }
+    
+    // Allow logging of telegram messages
+    match /telegram_logs/{logId} {
+      allow read, write: if true;
+    }
   }
 }

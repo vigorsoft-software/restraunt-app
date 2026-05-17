@@ -12,8 +12,9 @@ import { AIWriter } from '@/components/admin/AIWriter';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { LayoutDashboard, ShoppingCart, Package, Settings, Plus, Save, Loader2, Database, Trash2, Edit2, List, Users, LogOut, ShieldCheck, CheckCircle, Clock, Utensils, Image as ImageIcon, Key } from 'lucide-react';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useFirebaseApp } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, getDoc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Product, Order, Category, User } from '@/lib/types';
@@ -22,11 +23,63 @@ import { toast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'categories' | 'users'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'categories' | 'users' | 'settings'>('inventory');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ mobile: '', password: '' });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const firestore = useFirestore();
+
+  const [telegramConfig, setTelegramConfig] = useState({ botToken: '', chatId: '' });
+
+  useEffect(() => {
+    if (firestore && isAuthenticated && activeTab === 'settings') {
+      getDoc(doc(firestore, 'settings', 'telegram')).then(snap => {
+        if (snap.exists()) {
+          setTelegramConfig(snap.data() as { botToken: string, chatId: string });
+        }
+      });
+    }
+  }, [firestore, isAuthenticated, activeTab]);
+
+  const handleSaveTelegramConfig = async () => {
+    if (!firestore) return;
+    try {
+      await setDoc(doc(firestore, 'settings', 'telegram'), telegramConfig);
+      toast({ title: "Telegram configuration saved" });
+    } catch (error: any) {
+      console.error(error);
+      const permissionError = new FirestorePermissionError({
+        path: 'settings/telegram',
+        operation: 'write',
+        requestResourceData: telegramConfig,
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    }
+  };
+  const app = useFirebaseApp();
+  const storage = useMemoFirebase(() => app ? getStorage(app) : null, [app]);
+
+  const [isUploadingProductImg, setIsUploadingProductImg] = useState(false);
+  const [isUploadingCategoryImg, setIsUploadingCategoryImg] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, path: string, setUrl: (url: string) => void, setLoading: (l: boolean) => void) => {
+    const file = e.target.files?.[0];
+    if (!file || !storage) return;
+
+    setLoading(true);
+    try {
+      const storageRef = ref(storage, `${path}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      setUrl(downloadURL);
+      toast({ title: "Image uploaded successfully" });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({ title: "Failed to upload image", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({
     name: '',
@@ -278,6 +331,7 @@ export default function AdminPage() {
           <Button variant={activeTab === 'categories' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('categories')}><List className="w-5 h-5" /> Categories</Button>
           <Button variant={activeTab === 'orders' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('orders')}><ShoppingCart className="w-5 h-5" /> Orders</Button>
           <Button variant={activeTab === 'users' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('users')}><Users className="w-5 h-5" /> User Base</Button>
+          <Button variant={activeTab === 'settings' ? 'secondary' : 'ghost'} className="justify-start gap-4 h-14 rounded-2xl font-bold text-base" onClick={() => setActiveTab('settings')}><Settings className="w-5 h-5" /> Settings</Button>
         </nav>
         <Button variant="ghost" className="justify-start gap-4 h-14 rounded-2xl text-destructive font-bold" onClick={handleLogout}><LogOut className="w-5 h-5" /> Sign Out</Button>
       </aside>
@@ -307,14 +361,20 @@ export default function AdminPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Image URL</Label>
+                      <Label>Dish Image</Label>
                       <div className="flex gap-2">
-                        <Input value={editingProduct.imageUrl} onChange={e => setEditingProduct(p => ({...p, imageUrl: e.target.value}))} placeholder="https://..."/>
-                        <Button variant="outline" size="icon" onClick={() => setEditingProduct(p => ({...p, imageUrl: `https://picsum.photos/seed/${Math.random()}/600/600`}))}>
+                        <Input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={e => handleImageUpload(e, 'products', url => setEditingProduct(p => ({...p, imageUrl: url})), setIsUploadingProductImg)}
+                          className="file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        />
+                        <Button variant="outline" size="icon" onClick={() => setEditingProduct(p => ({...p, imageUrl: `https://picsum.photos/seed/${Math.random()}/600/600`}))} title="Generate random image">
                           <ImageIcon className="w-4 h-4" />
                         </Button>
                       </div>
-                      {editingProduct.imageUrl && (
+                      {isUploadingProductImg && <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Uploading image...</div>}
+                      {editingProduct.imageUrl && !isUploadingProductImg && (
                         <div className="mt-2 relative aspect-square rounded-2xl overflow-hidden border border-border/50">
                           <Image src={editingProduct.imageUrl} alt="Preview" fill className="object-cover" />
                         </div>
@@ -369,14 +429,20 @@ export default function AdminPage() {
                       <Input placeholder="e.g. Signature Mains" value={editingCategory.name} onChange={e => setEditingCategory(c => ({...c, name: e.target.value}))}/>
                     </div>
                     <div className="space-y-2">
-                      <Label>Image URL</Label>
+                      <Label>Category Image</Label>
                       <div className="flex gap-2">
-                        <Input value={editingCategory.imageUrl} onChange={e => setEditingCategory(c => ({...c, imageUrl: e.target.value}))} placeholder="https://..."/>
-                        <Button variant="outline" size="icon" onClick={() => setEditingCategory(c => ({...c, imageUrl: `https://picsum.photos/seed/cat-${Math.random()}/400/300`}))}>
+                        <Input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={e => handleImageUpload(e, 'categories', url => setEditingCategory(c => ({...c, imageUrl: url})), setIsUploadingCategoryImg)}
+                          className="file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        />
+                        <Button variant="outline" size="icon" onClick={() => setEditingCategory(c => ({...c, imageUrl: `https://picsum.photos/seed/cat-${Math.random()}/400/300`}))} title="Generate random image">
                           <ImageIcon className="w-4 h-4" />
                         </Button>
                       </div>
-                      {editingCategory.imageUrl && (
+                      {isUploadingCategoryImg && <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Uploading image...</div>}
+                      {editingCategory.imageUrl && !isUploadingCategoryImg && (
                         <div className="mt-2 relative aspect-video rounded-xl overflow-hidden border border-border/50">
                           <Image src={editingCategory.imageUrl} alt="Category Preview" fill className="object-cover" />
                         </div>
@@ -525,6 +591,38 @@ export default function AdminPage() {
                 </TableBody>
               </Table>
             </Card>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="max-w-2xl">
+              <Card className="bg-card border-border/50 rounded-3xl overflow-hidden shadow-xl">
+                <CardHeader className="bg-muted/30">
+                  <CardTitle className="text-sm uppercase tracking-widest font-bold">Telegram Notifications</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-8">
+                  <p className="text-sm text-muted-foreground">Configure a Telegram Bot to receive real-time order notifications.</p>
+                  <div className="space-y-2">
+                    <Label>Bot Token</Label>
+                    <Input 
+                      placeholder="e.g. 123456789:ABCdefGHIjklMNO..." 
+                      value={telegramConfig.botToken} 
+                      onChange={e => setTelegramConfig(p => ({...p, botToken: e.target.value}))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Chat ID</Label>
+                    <Input 
+                      placeholder="e.g. -1001234567890" 
+                      value={telegramConfig.chatId} 
+                      onChange={e => setTelegramConfig(p => ({...p, chatId: e.target.value}))}
+                    />
+                  </div>
+                  <Button className="h-12 gap-2 font-bold rounded-xl" onClick={handleSaveTelegramConfig}>
+                    <Save className="w-4 h-4" /> Save Configuration
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </main>
