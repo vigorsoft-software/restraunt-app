@@ -67,15 +67,25 @@ export default function AdminPage() {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, path: string, setUrl: (url: string) => void, setLoading: (l: boolean) => void) => {
     const file = e.target.files?.[0];
-    if (!file || !storage) return;
+    if (!file) return;
 
     setLoading(true);
     try {
-      const storageRef = ref(storage, `${path}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      setUrl(downloadURL);
-      toast({ title: "Image uploaded successfully" });
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      if (data.success && data.url) {
+        setUrl(data.url);
+        toast({ title: "Image uploaded successfully" });
+      } else {
+        throw new Error(data.error || 'Upload failed');
+      }
     } catch (error) {
       console.error('Upload error:', error);
       toast({ title: "Failed to upload image", variant: "destructive" });
