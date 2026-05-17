@@ -36,6 +36,7 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
     
     const orderId = Math.random().toString(36).substr(2, 9);
     const orderRef = doc(firestore, 'orders', orderId);
+    const userRef = doc(firestore, 'users', formData.mobile);
     
     const orderData = {
       id: orderId,
@@ -47,22 +48,33 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
       createdAt: serverTimestamp()
     };
 
-    setDoc(orderRef, orderData)
-      .then(() => {
-        setLoading(false);
-        setSuccess(true);
-        clearCart();
-        toast({ title: "Order placed successfully!" });
-      })
-      .catch(async (error) => {
-        setLoading(false);
-        const permissionError = new FirestorePermissionError({
-          path: orderRef.path,
-          operation: 'create',
-          requestResourceData: orderData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    const userData = {
+      mobileNumber: formData.mobile,
+      name: formData.name,
+      isAdmin: false,
+      lastOrderedAt: serverTimestamp()
+    };
+
+    // Save order and ensure user exists
+    Promise.all([
+      setDoc(orderRef, orderData),
+      setDoc(userRef, userData, { merge: true })
+    ])
+    .then(() => {
+      setLoading(false);
+      setSuccess(true);
+      clearCart();
+      toast({ title: "Order placed successfully!" });
+    })
+    .catch(async (error) => {
+      setLoading(false);
+      const permissionError = new FirestorePermissionError({
+        path: orderRef.path,
+        operation: 'create',
+        requestResourceData: orderData,
       });
+      errorEmitter.emit('permission-error', permissionError);
+    });
   };
 
   if (success) {
@@ -100,7 +112,7 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
           <Label htmlFor="mobile" className="text-sm text-muted-foreground uppercase tracking-wider font-bold">Mobile Number</Label>
           <Input 
             id="mobile" 
-            placeholder="+91 98765 43210" 
+            placeholder="9876543210" 
             className="h-12 bg-muted/50 border-none rounded-xl"
             value={formData.mobile}
             onChange={e => setFormData(prev => ({ ...prev, mobile: e.target.value }))}

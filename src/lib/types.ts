@@ -28,3 +28,11 @@ export interface Order {
   status: 'pending' | 'confirmed' | 'delivered';
   createdAt: any;
 }
+
+export interface User {
+  mobileNumber: string;
+  name: string;
+  isAdmin: boolean;
+  password?: string;
+  lastOrderedAt?: any;
+}

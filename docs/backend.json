@@ -41,6 +41,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["customerName", "mobileNumber", "items", "totalAmount", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A customer or admin user",
+      "type": "object",
+      "properties": {
+        "mobileNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "password": { "type": "string" },
+        "lastOrderedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["mobileNumber", "name", "isAdmin"]
     }
   },
   "auth": {
@@ -58,6 +71,10 @@
     "/orders/{orderId}": {
       "schema": "#/backend/entities/Order",
       "description": "Collection of customer orders"
+    },
+    "/users/{mobileNumber}": {
+      "schema": "#/backend/entities/User",
+      "description": "Collection of users and admins"
     }
   }
 }
