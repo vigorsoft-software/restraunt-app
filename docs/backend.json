@@ -45,13 +45,13 @@
     },
     "User": {
       "title": "User",
-      "description": "A customer or admin user",
+      "description": "A customer or admin user with authentication details",
       "type": "object",
       "properties": {
-        "mobileNumber": { "type": "string" },
+        "mobileNumber": { "type": "string", "description": "Acts as the unique identifier and document ID" },
         "name": { "type": "string" },
         "isAdmin": { "type": "boolean" },
-        "password": { "type": "string" },
+        "password": { "type": "string", "description": "Stored as plain-text for prototype simplicity" },
         "lastOrderedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["mobileNumber", "name", "isAdmin"]
@@ -89,11 +89,11 @@
     },
     "/users/{mobileNumber}": {
       "schema": "#/backend/entities/User",
-      "description": "Collection of users and admins"
+      "description": "Collection of users and admins identified by mobile number"
     },
     "/notifications/{notificationId}": {
       "schema": "#/backend/entities/Notification",
-      "description": "Real-time notifications for users"
+      "description": "Real-time notifications for status updates and new orders"
     }
   }
 }
