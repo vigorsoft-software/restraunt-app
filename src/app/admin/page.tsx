@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AIWriter } from '@/components/admin/AIWriter';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { LayoutDashboard, ShoppingCart, Package, Settings, Plus, Save, Loader2, Database, Trash2, Edit2, List, Users, LogOut, ShieldCheck, CheckCircle, Clock, Utensils } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Settings, Plus, Save, Loader2, Database, Trash2, Edit2, List, Users, LogOut, ShieldCheck, CheckCircle, Clock, Utensils, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, getDoc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
@@ -19,6 +19,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Product, Order, Category, User } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'categories' | 'users'>('inventory');
@@ -32,10 +33,12 @@ export default function AdminPage() {
     description: '',
     price: 0,
     category: '',
+    imageUrl: '',
   });
 
   const [editingCategory, setEditingCategory] = useState<Partial<Category>>({
     name: '',
+    imageUrl: '',
   });
 
   const [editingUser, setEditingUser] = useState<Partial<User>>({
@@ -98,7 +101,6 @@ export default function AdminPage() {
     updateDoc(orderRef, { status }).then(() => {
       toast({ title: `Order marked as ${status}` });
       
-      // Notify customer
       const notificationRef = collection(firestore, 'notifications');
       addDoc(notificationRef, {
         userId: customerMobile,
@@ -130,7 +132,7 @@ export default function AdminPage() {
     setDoc(productRef, productData, { merge: true })
       .then(() => {
         toast({ title: editingProduct.id ? "Product updated" : "Product added" });
-        setEditingProduct({ name: '', description: '', price: 0, category: '' });
+        setEditingProduct({ name: '', description: '', price: 0, category: '', imageUrl: '' });
       })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: productRef.path, operation: 'write', requestResourceData: productData }));
@@ -143,13 +145,28 @@ export default function AdminPage() {
   };
 
   const handleSaveCategory = () => {
-    if (!firestore || !editingCategory.name) return;
+    if (!firestore || !editingCategory.name) {
+      toast({ title: "Category name is required", variant: "destructive" });
+      return;
+    }
     const catId = editingCategory.id || Math.random().toString(36).substring(2, 9);
     const catRef = doc(firestore, 'categories', catId);
-    setDoc(catRef, { id: catId, name: editingCategory.name }, { merge: true }).then(() => {
+    
+    const categoryData = {
+      id: catId,
+      name: editingCategory.name,
+      imageUrl: editingCategory.imageUrl || `https://picsum.photos/seed/cat-${catId}/400/300`
+    } as Category;
+
+    setDoc(catRef, categoryData, { merge: true }).then(() => {
       toast({ title: "Category saved" });
-      setEditingCategory({ name: '' });
+      setEditingCategory({ name: '', imageUrl: '' });
     });
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    if (!firestore) return;
+    deleteDoc(doc(firestore, 'categories', id)).then(() => toast({ title: "Category deleted" }));
   };
 
   const handleSaveUser = () => {
@@ -164,7 +181,6 @@ export default function AdminPage() {
   const handleSeedDatabase = () => {
     if (!firestore) return;
     
-    // Seed Admin
     setDoc(doc(firestore, 'users', 'admin'), {
       mobileNumber: 'admin',
       name: 'Super Admin',
@@ -172,10 +188,13 @@ export default function AdminPage() {
       password: 'admin'
     });
 
-    // Seed Categories
     ['Starters', 'Soups', 'Mains', 'Juice', 'Desserts'].forEach(name => {
       const id = name.toLowerCase();
-      setDoc(doc(firestore, 'categories', id), { id, name });
+      setDoc(doc(firestore, 'categories', id), { 
+        id, 
+        name,
+        imageUrl: `https://picsum.photos/seed/cat-${id}/400/300`
+      });
     });
 
     INITIAL_PRODUCTS.forEach(p => setDoc(doc(firestore, 'products', p.id), p));
@@ -256,10 +275,24 @@ export default function AdminPage() {
                         <SelectContent>{categories?.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Image URL</Label>
+                      <div className="flex gap-2">
+                        <Input value={editingProduct.imageUrl} onChange={e => setEditingProduct(p => ({...p, imageUrl: e.target.value}))} placeholder="https://..."/>
+                        <Button variant="outline" size="icon" onClick={() => setEditingProduct(p => ({...p, imageUrl: `https://picsum.photos/seed/${Math.random()}/600/600`}))}>
+                          <ImageIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {editingProduct.imageUrl && (
+                        <div className="mt-2 relative aspect-square rounded-lg overflow-hidden border border-border">
+                          <Image src={editingProduct.imageUrl} alt="Preview" fill className="object-cover" />
+                        </div>
+                      )}
+                    </div>
                     <AIWriter onGenerated={desc => setEditingProduct(p => ({...p, description: desc}))} />
                     <div className="space-y-2"><Label>Menu Description</Label><Textarea value={editingProduct.description} onChange={e => setEditingProduct(p => ({...p, description: e.target.value}))}/></div>
                     <div className="space-y-2"><Label>Price (₹)</Label><Input type="number" value={editingProduct.price} onChange={e => setEditingProduct(p => ({...p, price: Number(e.target.value)}))}/></div>
-                    <Button className="w-full gap-2 font-bold" onClick={handleSaveProduct}><Save className="w-4 h-4" /> Save</Button>
+                    <Button className="w-full gap-2 font-bold" onClick={handleSaveProduct}><Save className="w-4 h-4" /> Save Dish</Button>
                   </CardContent>
                 </Card>
               </div>
@@ -267,9 +300,24 @@ export default function AdminPage() {
                 <Card className="bg-card border-border/50 rounded-2xl overflow-hidden">
                   {productsLoading ? <div className="p-20 flex justify-center"><Loader2 className="animate-spin" /></div> : (
                     <Table>
-                      <TableHeader className="bg-muted/30"><TableRow><TableHead>Product</TableHead><TableHead>Category</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                      <TableHeader className="bg-muted/30"><TableRow><TableHead>Dish</TableHead><TableHead>Category</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                       <TableBody>{products?.map(p => (
-                        <TableRow key={p.id}><TableCell className="font-bold">{p.name}</TableCell><TableCell>{p.category}</TableCell><TableCell className="text-right text-primary font-bold">₹{p.price.toFixed(2)}</TableCell><TableCell className="text-right space-x-2"><Button variant="ghost" size="icon" onClick={() => setEditingProduct(p)}><Edit2 className="w-4 h-4" /></Button><Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteProduct(p.id)}><Trash2 className="w-4 h-4" /></Button></TableCell></TableRow>
+                        <TableRow key={p.id}>
+                          <TableCell className="font-bold">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded overflow-hidden relative border border-border">
+                                <Image src={p.imageUrl} alt={p.name} fill className="object-cover" />
+                              </div>
+                              {p.name}
+                            </div>
+                          </TableCell>
+                          <TableCell>{p.category}</TableCell>
+                          <TableCell className="text-right text-primary font-bold">₹{p.price.toFixed(2)}</TableCell>
+                          <TableCell className="text-right space-x-2">
+                            <Button variant="ghost" size="icon" onClick={() => setEditingProduct(p)}><Edit2 className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteProduct(p.id)}><Trash2 className="w-4 h-4" /></Button>
+                          </TableCell>
+                        </TableRow>
                       ))}</TableBody>
                     </Table>
                   )}
@@ -280,16 +328,55 @@ export default function AdminPage() {
 
           {activeTab === 'categories' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1"><Card className="bg-card border-border/50 rounded-2xl"><CardHeader><CardTitle>Category Editor</CardTitle></CardHeader>
-                <CardContent className="space-y-6">
-                  <Input placeholder="Category Name" value={editingCategory.name} onChange={e => setEditingCategory(c => ({...c, name: e.target.value}))}/>
-                  <Button className="w-full gap-2 font-bold" onClick={handleSaveCategory}><Save className="w-4 h-4" /> Save Category</Button>
-                </CardContent></Card></div>
-              <div className="lg:col-span-2"><Card className="bg-card border-border/50 rounded-2xl overflow-hidden">
-                <Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                  <TableBody>{categories?.map(c => (
-                    <TableRow key={c.id}><TableCell className="font-bold">{c.name}</TableCell><TableCell className="text-right space-x-2"><Button variant="ghost" size="icon" onClick={() => setEditingCategory(c)}><Edit2 className="w-4 h-4" /></Button></TableCell></TableRow>
-                  ))}</TableBody></Table></Card></div>
+              <div className="lg:col-span-1">
+                <Card className="bg-card border-border/50 rounded-2xl">
+                  <CardHeader><CardTitle>{editingCategory.id ? 'Edit Category' : 'Add Category'}</CardTitle></CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Label>Category Name</Label>
+                      <Input placeholder="e.g. Starters" value={editingCategory.name} onChange={e => setEditingCategory(c => ({...c, name: e.target.value}))}/>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category Image URL</Label>
+                      <div className="flex gap-2">
+                        <Input value={editingCategory.imageUrl} onChange={e => setEditingCategory(c => ({...c, imageUrl: e.target.value}))} placeholder="https://..."/>
+                        <Button variant="outline" size="icon" onClick={() => setEditingCategory(c => ({...c, imageUrl: `https://picsum.photos/seed/cat-${Math.random()}/400/300`}))}>
+                          <ImageIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {editingCategory.imageUrl && (
+                        <div className="mt-2 relative aspect-video rounded-lg overflow-hidden border border-border">
+                          <Image src={editingCategory.imageUrl} alt="Category Preview" fill className="object-cover" />
+                        </div>
+                      )}
+                    </div>
+                    <Button className="w-full gap-2 font-bold" onClick={handleSaveCategory}><Save className="w-4 h-4" /> Save Category</Button>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="lg:col-span-2">
+                <Card className="bg-card border-border/50 rounded-2xl overflow-hidden">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableBody>{categories?.map(c => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-bold">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-8 rounded overflow-hidden relative border border-border">
+                              <Image src={c.imageUrl || 'https://placehold.co/400x300?text=No+Image'} alt={c.name} fill className="object-cover" />
+                            </div>
+                            {c.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="ghost" size="icon" onClick={() => setEditingCategory(c)}><Edit2 className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteCategory(c.id)}><Trash2 className="w-4 h-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}</TableBody>
+                  </Table>
+                </Card>
+              </div>
             </div>
           )}
 

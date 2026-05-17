@@ -3,6 +3,7 @@ export interface Category {
   id: string;
   name: string;
   order?: number;
+  imageUrl?: string;
 }
 
 export interface Product {

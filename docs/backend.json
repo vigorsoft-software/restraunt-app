@@ -23,7 +23,8 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "order": { "type": "number" }
+        "order": { "type": "number" },
+        "imageUrl": { "type": "string" }
       },
       "required": ["name"]
     },
