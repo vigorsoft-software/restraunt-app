@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ShoppingBag, Menu, User } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetTrigger, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { CartDrawer } from '../cart/CartDrawer';
 
 export function Navbar() {
@@ -29,6 +29,7 @@ export function Navbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[300px] sm:w-[400px]">
+              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <nav className="flex flex-col gap-4 mt-8">
                 <Link href="/" className="text-lg font-medium hover:text-primary transition-colors">Menu</Link>
                 <Link href="/#signature" className="text-lg font-medium hover:text-primary transition-colors">Signatures</Link>

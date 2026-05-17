@@ -56,7 +56,7 @@ export function CartDrawer() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="font-headline text-lg truncate">{item.name}</h4>
-                    <p className="text-primary font-bold">₹{item.price.toFixed(2)}</p>
+                    <p className="text-primary font-bold">INR {item.price.toFixed(2)}</p>
                     <div className="flex items-center gap-3 mt-2">
                       <div className="flex items-center border border-border rounded-full p-1">
                         <Button 
@@ -98,7 +98,7 @@ export function CartDrawer() {
         <div className="w-full space-y-4">
           <div className="flex items-center justify-between text-lg font-bold">
             <span>Subtotal</span>
-            <span className="text-primary">₹{total.toFixed(2)}</span>
+            <span className="text-primary">INR {total.toFixed(2)}</span>
           </div>
           <Button 
             className="w-full h-12 text-lg font-bold" 

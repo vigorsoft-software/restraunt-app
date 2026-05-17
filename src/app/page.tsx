@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { MenuGrid } from '@/components/menu/MenuGrid';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function Home() {
   const heroImage = PlaceHolderImages.find(img => img.id === 'hero-bg');
@@ -30,10 +31,10 @@ export default function Home() {
 
           <div className="relative z-10 text-center space-y-6 max-w-4xl px-4 mt-20">
             <h1 className="text-6xl md:text-8xl font-headline italic tracking-tighter animate-in fade-in slide-in-from-bottom-8 duration-1000">
-              The Art of <span className="text-primary">Fine Living</span>
+              Your Daily <span className="text-primary">Coffee Fix</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground font-body max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200">
-              Artisanal recipes crafted with seasonally sourced ingredients, delivered for an immersive gastronomy experience at home.
+              Freshly brewed coffee and artisanal snacks, crafted with love and delivered to your doorstep.
             </p>
           </div>
         </header>
@@ -46,9 +47,10 @@ export default function Home() {
         <footer className="py-20 border-t border-border/50 text-center">
           <div className="max-w-7xl mx-auto px-4 space-y-4">
             <h2 className="text-3xl font-headline text-primary">Galaxy Grand Cafe</h2>
-            <p className="text-muted-foreground text-sm uppercase tracking-widest">Crafting Memories Since 2024</p>
-            <div className="pt-8 text-xs text-muted-foreground opacity-50">
-              &copy; 2024 Galaxy Grand Cafe. All rights reserved.
+            <p className="text-muted-foreground text-sm uppercase tracking-widest">Brewing Happiness Since 2024</p>
+            <div className="pt-8 text-xs text-muted-foreground opacity-50 flex flex-col md:flex-row items-center justify-center gap-4">
+              <span>&copy; 2026 Galaxy Grand Cafe. All rights reserved.</span>
+              <Link href="/admin" className="hover:text-primary transition-colors hover:underline">Admin Login</Link>
             </div>
           </div>
         </footer>

@@ -6,6 +6,7 @@ import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
@@ -20,7 +21,8 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    mobile: ''
+    mobile: '',
+    allowNotifications: true
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,6 +32,12 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
     if (!formData.name || !formData.mobile) {
       toast({ title: "Please fill all fields", variant: "destructive" });
       return;
+    }
+
+    if (formData.allowNotifications && 'Notification' in window) {
+      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
     }
 
     setLoading(true);
@@ -176,8 +184,8 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
           <CheckCircle2 className="w-10 h-10 text-primary" />
         </div>
         <div className="space-y-2">
-          <h3 className="font-headline text-3xl">Gourmet Confirmed</h3>
-          <p className="text-muted-foreground">Your order has been received. Our chef is beginning the preparation.</p>
+          <h3 className="font-headline text-3xl">Order Confirmed</h3>
+          <p className="text-muted-foreground">Your order has been received. Our barista is preparing it for you.</p>
         </div>
         <Button className="w-full" onClick={() => window.location.href = '/'}>
           Return to Menu
@@ -211,6 +219,19 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
             required
             type="tel"
           />
+        </div>
+        <div className="flex items-center space-x-2 pt-2">
+          <Checkbox 
+            id="notifications" 
+            checked={formData.allowNotifications} 
+            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allowNotifications: checked === true }))} 
+          />
+          <Label
+            htmlFor="notifications"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 normal-case tracking-normal"
+          >
+            Allow notifications for real-time order updates
+          </Label>
         </div>
       </div>
 
