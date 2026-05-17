@@ -16,8 +16,10 @@ function initializeFirebaseAdmin() {
     } else {
       console.warn('FIREBASE_SERVICE_ACCOUNT not set. Attempting default initialization.');
       // Initialize without args allows it to pick up GOOGLE_APPLICATION_CREDENTIALS or work in emulator
-      // If we are at build time in Next.js, we don't want it to crash, so we catch errors.
-      admin.initializeApp();
+      // Passing projectId prevents "Unable to detect a Project Id" crashes
+      admin.initializeApp({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      });
     }
   } catch (error) {
     console.warn('Firebase admin initialization error/warning during build or runtime', error);
