@@ -7,22 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Plus, Loader2 } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useState, useMemo } from 'react';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 export function MenuGrid() {
   const { addItem } = useCart();
-  const [activeCategory, setActiveCategory] = useState<Category>('All');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
   const firestore = useFirestore();
 
-  const productsRef = useMemo(() => {
+  const productsRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return collection(firestore, 'products');
   }, [firestore]);
 
-  const { data: products, loading } = useCollection<Product>(productsRef);
+  const categoriesRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'categories');
+  }, [firestore]);
 
-  const categories: Category[] = ['All', 'Starters', 'Soups', 'Mains', 'Juice', 'Desserts'];
+  const { data: products, loading: productsLoading } = useCollection<Product>(productsRef);
+  const { data: categories, loading: categoriesLoading } = useCollection<Category>(categoriesRef);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -31,7 +35,7 @@ export function MenuGrid() {
       : products.filter(p => p.category === activeCategory);
   }, [products, activeCategory]);
 
-  if (loading) {
+  if (productsLoading || categoriesLoading) {
     return (
       <div className="flex justify-center items-center py-20">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -42,14 +46,21 @@ export function MenuGrid() {
   return (
     <div className="space-y-12">
       <div className="flex flex-wrap items-center justify-center gap-2 overflow-x-auto pb-4 scrollbar-hide">
-        {categories.map((cat) => (
+        <Button
+          variant={activeCategory === 'All' ? 'default' : 'outline'}
+          className={`rounded-full px-6 h-10 font-bold transition-all ${activeCategory === 'All' ? 'scale-105' : 'text-muted-foreground'}`}
+          onClick={() => setActiveCategory('All')}
+        >
+          All
+        </Button>
+        {categories?.map((cat) => (
           <Button
-            key={cat}
-            variant={activeCategory === cat ? 'default' : 'outline'}
-            className={`rounded-full px-6 h-10 font-bold transition-all ${activeCategory === cat ? 'scale-105' : 'text-muted-foreground'}`}
-            onClick={() => setActiveCategory(cat)}
+            key={cat.id}
+            variant={activeCategory === cat.name ? 'default' : 'outline'}
+            className={`rounded-full px-6 h-10 font-bold transition-all ${activeCategory === cat.name ? 'scale-105' : 'text-muted-foreground'}`}
+            onClick={() => setActiveCategory(cat.name)}
           >
-            {cat}
+            {cat.name}
           </Button>
         ))}
       </div>
@@ -86,7 +97,7 @@ export function MenuGrid() {
                     {product.description}
                   </p>
                   <div className="flex items-center justify-between pt-2">
-                    <span className="text-xl font-bold font-headline">${product.price.toFixed(2)}</span>
+                    <span className="text-xl font-bold font-headline">₹{product.price.toFixed(2)}</span>
                     <Button 
                       size="icon" 
                       className="rounded-full w-10 h-10 shadow-lg scale-0 group-hover:scale-100 transition-transform duration-300"

@@ -89,7 +89,7 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
           <Label htmlFor="name" className="text-sm text-muted-foreground uppercase tracking-wider font-bold">Full Name</Label>
           <Input 
             id="name" 
-            placeholder="Jean-Luc Picard" 
+            placeholder="Arjun Singh" 
             className="h-12 bg-muted/50 border-none rounded-xl"
             value={formData.name}
             onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -100,7 +100,7 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
           <Label htmlFor="mobile" className="text-sm text-muted-foreground uppercase tracking-wider font-bold">Mobile Number</Label>
           <Input 
             id="mobile" 
-            placeholder="+1 (555) 000-0000" 
+            placeholder="+91 98765 43210" 
             className="h-12 bg-muted/50 border-none rounded-xl"
             value={formData.mobile}
             onChange={e => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
@@ -116,12 +116,12 @@ export function CheckoutForm({ onBack }: { onBack: () => void }) {
           {items.map(item => (
             <div key={item.id} className="flex justify-between text-sm">
               <span className="text-muted-foreground">{item.quantity}x {item.name}</span>
-              <span className="font-bold">${(item.price * item.quantity).toFixed(2)}</span>
+              <span className="font-bold">₹{(item.price * item.quantity).toFixed(2)}</span>
             </div>
           ))}
           <div className="pt-2 border-t border-border/50 flex justify-between font-bold text-lg">
             <span>Total Payable</span>
-            <span className="text-primary">${total.toFixed(2)}</span>
+            <span className="text-primary">₹{total.toFixed(2)}</span>
           </div>
         </div>
       </div>

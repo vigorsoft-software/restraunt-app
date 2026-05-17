@@ -16,6 +16,17 @@
       },
       "required": ["name", "price", "category"]
     },
+    "Category": {
+      "title": "Category",
+      "description": "A menu category (e.g., Starters, Mains)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["name"]
+    },
     "Order": {
       "title": "Order",
       "description": "A customer order",
@@ -39,6 +50,10 @@
     "/products/{productId}": {
       "schema": "#/backend/entities/Product",
       "description": "Collection of menu items"
+    },
+    "/categories/{categoryId}": {
+      "schema": "#/backend/entities/Category",
+      "description": "Collection of menu categories"
     },
     "/orders/{orderId}": {
       "schema": "#/backend/entities/Order",
